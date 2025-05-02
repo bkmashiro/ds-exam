@@ -1,0 +1,10 @@
+{
+  "name": "Yuzhe",
+  "address": {
+    "street": "1 Main Street",
+    "city": "beijing",
+    "country": "China"
+  },
+  "email": "yuzhe@beijing.cn",
+  "address.country": "China"
+}

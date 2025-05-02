@@ -1,0 +1,9 @@
+{
+  "name": "Nagisa",
+  "address": {
+    "street": "1 Main Street",
+    "city": "Tokyo",
+    "country": "Japan"
+  },
+  "email": "nagisa@tokyo.jp"
+}

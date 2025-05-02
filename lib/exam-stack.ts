@@ -73,7 +73,7 @@ export class ExamStack extends cdk.Stack {
         allowOrigins: ["*"],
       },
       endpointConfiguration: {
-        types: [apig.EndpointType.REGIONAL]
+        types: [apig.EndpointType.REGIONAL],
       },
       policy: new iam.PolicyDocument({
         statements: [
@@ -81,10 +81,10 @@ export class ExamStack extends cdk.Stack {
             effect: iam.Effect.ALLOW,
             principals: [new iam.AnyPrincipal()],
             actions: ["execute-api:Invoke"],
-            resources: ["execute-api:/*/*/*"]
-          })
-        ]
-      })
+            resources: ["execute-api:/*/*/*"],
+          }),
+        ],
+      }),
     });
 
     new cdk.CfnOutput(this, "ExamAPIUrl", {
@@ -96,7 +96,7 @@ export class ExamStack extends cdk.Stack {
     const moviesResource = crewResource.addResource("movies");
     const movieResource = moviesResource.addResource("{movieId}");
     movieResource.addMethod("GET", new apig.LambdaIntegration(question1Fn), {
-      authorizationType: apig.AuthorizationType.NONE
+      authorizationType: apig.AuthorizationType.NONE,
     });
 
     // ==================================
@@ -110,6 +110,11 @@ export class ExamStack extends cdk.Stack {
 
     const topic1 = new sns.Topic(this, "Topic1", {
       displayName: "Exam topic",
+    });
+
+    new cdk.CfnOutput(this, "Topic1Arn", {
+      value: topic1.topicArn,
+      description: "ARN of the Topic1",
     });
 
     const queueB = new sqs.Queue(this, "QueueB", {
@@ -141,9 +146,44 @@ export class ExamStack extends cdk.Stack {
         REGION: "eu-west-1",
       },
     });
-
-    topic1.addSubscription(new subs.SqsSubscription(queueA));
-    topic1.addSubscription(new subs.LambdaSubscription(lambdaYFn));
+    //   {
+    //     "name": string,
+    //     "address" : {
+    //         "street": string,
+    //         "city": string,
+    //         "country": string
+    //  },
+    //     "email": string
+    //  }
+    topic1.addSubscription(
+      new subs.SqsSubscription(queueA, {
+        filterPolicyWithMessageBody: {
+          "address.country": sns.FilterOrPolicy.filter(
+            sns.SubscriptionFilter.stringFilter({
+              allowlist: ["Ireland", "China"],
+            })
+          ),
+        },
+      })
+    );
+    topic1.addSubscription(
+      // new subs.LambdaSubscription(lambdaYFn, {
+      //   filterPolicy: {
+      //     "address.country": sns.SubscriptionFilter.stringFilter({
+      //       denylist: ["Ireland", "China"],
+      //     }),
+      //   },
+      // })
+      new subs.LambdaSubscription(lambdaYFn, {
+        filterPolicyWithMessageBody: {
+          "address.country": sns.FilterOrPolicy.filter(
+            sns.SubscriptionFilter.stringFilter({
+              denylist: ["Ireland", "China"],
+            })
+          ),
+        },
+      })
+    );
 
     lambdaXFn.addEventSource(new events.SqsEventSource(queueA));
 
