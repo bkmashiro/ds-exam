@@ -13,6 +13,7 @@ import * as events from "aws-cdk-lib/aws-lambda-event-sources";
 import * as sns from "aws-cdk-lib/aws-sns";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as subs from "aws-cdk-lib/aws-sns-subscriptions";
+import * as iam from "aws-cdk-lib/aws-iam";
 
 export class ExamStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -41,6 +42,9 @@ export class ExamStack extends cdk.Stack {
       },
     });
 
+    // Add DynamoDB permissions to the Lambda function
+    table.grantReadData(question1Fn);
+
     new custom.AwsCustomResource(this, "moviesddbInitData", {
       onCreate: {
         service: "DynamoDB",
@@ -68,15 +72,37 @@ export class ExamStack extends cdk.Stack {
         allowCredentials: true,
         allowOrigins: ["*"],
       },
+      endpointConfiguration: {
+        types: [apig.EndpointType.REGIONAL]
+      },
+      policy: new iam.PolicyDocument({
+        statements: [
+          new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            principals: [new iam.AnyPrincipal()],
+            actions: ["execute-api:Invoke"],
+            resources: ["execute-api:/*/*/*"]
+          })
+        ]
+      })
     });
 
-    const anEndpoint = api.root.addResource("patha");
+    new cdk.CfnOutput(this, "ExamAPIUrl", {
+      value: api.url,
+      description: "URL of the Exam API",
+    });
 
+    const crewResource = api.root.addResource("crew");
+    const moviesResource = crewResource.addResource("movies");
+    const movieResource = moviesResource.addResource("{movieId}");
+    movieResource.addMethod("GET", new apig.LambdaIntegration(question1Fn), {
+      authorizationType: apig.AuthorizationType.NONE
+    });
 
     // ==================================
     // Question 2 - Event-Driven architecture
 
-     const bucket = new s3.Bucket(this, "exam-bucket", {
+    const bucket = new s3.Bucket(this, "exam-bucket", {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
       publicReadAccess: false,
@@ -85,7 +111,7 @@ export class ExamStack extends cdk.Stack {
     const topic1 = new sns.Topic(this, "Topic1", {
       displayName: "Exam topic",
     });
-    
+
     const queueB = new sqs.Queue(this, "QueueB", {
       receiveMessageWaitTime: cdk.Duration.seconds(5),
     });
@@ -93,7 +119,7 @@ export class ExamStack extends cdk.Stack {
     const queueA = new sqs.Queue(this, "queueA", {
       receiveMessageWaitTime: cdk.Duration.seconds(5),
     });
-    
+
     const lambdaXFn = new lambdanode.NodejsFunction(this, "LambdaXFn", {
       architecture: lambda.Architecture.ARM_64,
       runtime: lambda.Runtime.NODEJS_22_X,
@@ -115,7 +141,5 @@ export class ExamStack extends cdk.Stack {
         REGION: "eu-west-1",
       },
     });
-    
   }
 }
-  
