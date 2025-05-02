@@ -141,5 +141,13 @@ export class ExamStack extends cdk.Stack {
         REGION: "eu-west-1",
       },
     });
+
+    topic1.addSubscription(new subs.SqsSubscription(queueA));
+    topic1.addSubscription(new subs.LambdaSubscription(lambdaYFn));
+
+    lambdaXFn.addEventSource(new events.SqsEventSource(queueA));
+
+    topic1.grantPublish(new iam.ServicePrincipal("sns.amazonaws.com"));
+    queueA.grantConsumeMessages(lambdaXFn);
   }
 }
