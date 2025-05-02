@@ -1,10 +1,10 @@
-import { APIGatewayProxyHandler, APIGatewayProxyHandlerV2 } from "aws-lambda";
+import { APIGatewayProxyHandler } from "aws-lambda";
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,
-  DeleteCommand,
   GetCommand,
+  QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
 
 const client = createDDbDocClient();
@@ -24,7 +24,7 @@ export const handler: APIGatewayProxyHandler = async (event, context) => {
           headers: {
             "content-type": "application/json",
           },
-          body: JSON.stringify({ error: "Missing movieId or role parameter" }),
+          body: JSON.stringify({ error: "Missing movieId parameter" }),
         };
       }
 
@@ -32,6 +32,7 @@ export const handler: APIGatewayProxyHandler = async (event, context) => {
       console.log("role: ", role);
 
       if (role) {
+        // Get specific crew member
         const command = new GetCommand({
           TableName: process.env.TABLE_NAME,
           Key: {
@@ -61,16 +62,47 @@ export const handler: APIGatewayProxyHandler = async (event, context) => {
           },
           body: JSON.stringify(response.Item),
         };
+      } else {
+        // Get all crew members for the movie
+        const command = new QueryCommand({
+          TableName: process.env.TABLE_NAME,
+          KeyConditionExpression: "movieId = :movieId",
+          ExpressionAttributeValues: {
+            ":movieId": parseInt(movieId),
+          },
+        });
+
+        const response = await client.send(command);
+
+        console.log("response: ", response.Items);
+
+        if (!response.Items || response.Items.length === 0) {
+          return {
+            statusCode: 404,
+            headers: {
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({ error: "No crew members found for this movie" }),
+          };
+        }
+
+        return {
+          statusCode: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(response.Items),
+        };
       }
     }
 
     return {
-      statusCode: 200,
+      statusCode: 400,
       headers: {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        message: "Invalid request",
+        message: "Invalid request method",
       }),
     };
   } catch (error: any) {
